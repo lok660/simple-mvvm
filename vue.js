@@ -20,15 +20,34 @@ class Comiler {
     this.el.appendChild(fragment)
 
   }
-
+  //  是否为vue指令 v-model v-on
+  isDirective (attrName) {
+    return attrName.startsWith('v-')
+  }
   //  编译元素 (v-model)
   compileElement (node) {
+    //  拿到所有的属性
+    let attributes = node.attributes;
+    [...attributes].forEach(attr => {     //  type="text" v-model="school.age"
 
+      //  attr type="text"      name:type value"text  
+      let { name, value } = attr
+      //  如果是指令
+      if (this.isDirective(name)) {
+        console.log(node, 'element')
+      }
+    })
   }
 
   //  编译文本 ( {{}} )
+  //  判断当前文本节点内容中,是否包含 {{}}
   compileText (node) {
+    let content = node.textContent
 
+    //  通过正则拿到括号中间的值
+    if (/\{\{(.+?)\}\}/.test(content)) {
+      console.log(content)
+    }
   }
   /**
    * 核心编译方法 编译内存中的dom节点
@@ -43,6 +62,8 @@ class Comiler {
       if (this.isElementNode(child)) {
         //  使用元素编译方法
         this.compileElement(child)
+        //  如果是元素的话,需要把自己传进去,再去遍历子节点(递归)
+        this.compile(child)
       } else {
         //  使用文本编译方法
         this.compileText(child)
@@ -72,6 +93,19 @@ class Comiler {
    */
   isElementNode (node) {
     return node.nodeType === 1
+  }
+}
+
+//  编译工具 (不同功能调用不同方法)
+ComilerUtil = {
+  model () {
+
+  },
+  html () {
+
+  },
+  text () {
+
   }
 }
 
