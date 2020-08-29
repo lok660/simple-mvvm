@@ -1,3 +1,40 @@
+//  给数据加上劫持绑定,实现数据劫持功能
+class Observer {
+  constructor(data) {
+    this.observer(data)
+  }
+
+  observer (data) {
+    //  如果是对象才观察
+    if (data && typeof data === 'object') {
+      //  循环每一项,并给每一项加上劫持
+      for (const key in data) {
+        this.defineReactive(data, key, data[key])
+      }
+    }
+  }
+  defineReactive (obj, key, value) {
+    //  递归
+    this.observer(value)
+    Object.defineProperty(obj, key, {
+      get () {
+        return value
+      },
+      //  设置新值
+      set: (newval) => {
+        // 如果新值与旧值不相等,就更新值
+        if (newval !== value) {
+          // 将新值重新绑定
+          this.observer(newval)
+          //  更新值
+          value = newval
+        }
+      }
+    })
+  }
+}
+
+
 //  编译
 class Comiler {
   /**
@@ -161,6 +198,11 @@ class Vue {
     //  这个根元素 存在 编译模板
     //  el:"#app"
     if (this.$el) {
+
+      //  将数据 全部转换成用 Object.defineProperty定义
+      new Observer(this.$data)
+
+      //  编译
       new Comiler(this.$el, this)
     }
   }
