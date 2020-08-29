@@ -30,11 +30,17 @@ class Comiler {
     let attributes = node.attributes;
     [...attributes].forEach(attr => {     //  type="text" v-model="school.age"
 
-      //  attr type="text"      name:type value"text  
-      let { name, value } = attr
+      //  attr: v-model="school.name"  
+      //  name: v-model,expr:"school.name"  from attr
+      let { name, value: expr } = attr
+      console.log(attr)
       //  如果是指令
       if (this.isDirective(name)) {
-        console.log(node, 'element')
+        //  解构获取指令名 model html text
+        let [, directive] = name.split('-')
+
+        //  需要用不同的指令来处理
+        ComileUtil[directive](node, expr, this.vm)
       }
     })
   }
@@ -46,7 +52,9 @@ class Comiler {
 
     //  通过正则拿到括号中间的值
     if (/\{\{(.+?)\}\}/.test(content)) {
-      console.log(content)
+      // console.log(content)
+      //  文本节点
+      ComileUtil['text'](node, content, this.vm) //  {{a}} {{b}} 替换a和b
     }
   }
   /**
@@ -97,19 +105,55 @@ class Comiler {
 }
 
 //  编译工具 (不同功能调用不同方法)
-ComilerUtil = {
-  model () {
+ComileUtil = {
+  //  获取表达式的值方法  school.name => fish
+  getValue (vm, expr) {
+    return expr.split('.').reduce((data, curr) => data[curr], vm.$data)
+  },
+  /** 
+   * @param {*} node 节点 
+   * @param {*} expr 表达式 school.msg
+   * @param {*} vm  实例 vm.data取值
+   */
+  model (node, expr, vm) {
+    //  给输入框赋予value属性 node.value = xxx
 
+    //  获取model的更新方法
+    let fn = this.updater['modelUpdater']
+    //  获取表达式值方法
+    let value = this.getValue(vm, expr) //  返回 fish
+
+    fn(node, value)
   },
   html () {
-
+    //  node.innerHTML = xxx
   },
-  text () {
+  text (node, expr, vm) {
+    let fn = this.updater['textUpdater']
+    //  获取到 {{a}}  括号中间的值
+    let content = expr.replace(/\{\{(.+?)\}\}/g, (...args) => {
+      //  从vm中获取括号中的值
+      return this.getValue(vm, args[1])
+    })
 
+    fn(node, content)
+  },
+  updater: {
+    //  将数据插入到节点中
+    modelUpdater (node, value) {
+      node.value = value
+    },
+    htmlUpdater () {
+
+    },
+    //  处理文本节点
+    textUpdater (node, value) {
+      node.textContent = value
+    }
   }
 }
 
-//  基类  调度
+//  基类  调度``
 class Vue {
   constructor(options) {
     this.$el = options.el
