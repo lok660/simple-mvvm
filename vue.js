@@ -84,7 +84,6 @@ class Observer {
   }
 }
 
-
 //  编译
 class Comiler {
   /**
@@ -283,6 +282,7 @@ ComileUtil = {
     modelUpdater (node, value) {
       node.value = value
     },
+    //  处理v-html功能
     htmlUpdater () {
       node.innerHTML = value
     },
@@ -300,6 +300,7 @@ class Vue {
     this.$data = options.data
     let computed = options.computed
     let methods = options.methods
+
     //  这个根元素 存在 编译模板
     //  el:"#app"
     if (this.$el) {
@@ -318,8 +319,10 @@ class Vue {
         })
       }
 
+      //  实现methods功能
       for (const key in methods) {
         Object.defineProperty(this, key, {
+          //  获取方法
           get () {
             return methods[key]
           }
@@ -340,7 +343,7 @@ class Vue {
         get () {
           return data[key]    //  进行了转化操作
         },
-        set (newval) {
+        set (newval) {    //  设置代理方法
           data[key] = newval
         }
       })
