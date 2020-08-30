@@ -15,6 +15,7 @@ class Dep {
 
 //  观察者 (发布订阅)
 class Watcher {
+
   constructor(vm, expr, cb) {
     this.vm = vm
     this.expr = expr
@@ -26,7 +27,7 @@ class Watcher {
   getVal () {
     Dep.target = this   //  先把自己放在this上
     const value = ComileUtil.getValue(this.vm, this.expr)    //  取值,把观察者和数据关联起来
-    Dep.target = null   //  释放内存    如果不取消,任何值取值都会添加watcher
+    Dep.target = null
     return value
   }
   //  更新操作 数据变化后 会调用观察者的update方法 
@@ -63,21 +64,18 @@ class Observer {
     //  给每个属性加上监听
     Object.defineProperty(obj, key, {
       get () {
-        //  创建watcher时 会取到对应的内容,就会调用此方法
-        //  并且把watcher放到了全局上,一取值就把watcher放到了Dep上面,值一改变就触发notify方法
         Dep.target && dep.addSub(Dep.target)
-
+        //  创建watcher时 会取到对应的内容,并且把watcher放到了全局上
         return value
       },
       //  设置新值
       set: (newval) => {
         // 如果新值与旧值不相等,就更新值
         if (newval !== value) {
-
-          this.observer(newval)   //  // 将新值重新绑定
-          value = newval    //  更新值
-          //  改变了一个新的值,就通知更新
-          dep.notify()
+          // 将新值重新绑定
+          this.observer(newval)
+          //  更新值
+          value = newval
         }
       }
     })
@@ -197,15 +195,6 @@ ComileUtil = {
   getValue (vm, expr) {
     return expr.split('.').reduce((data, curr) => data[curr], vm.$data)
   },
-  setValue (vm, expr, value) {
-    expr.split('.').reduce((data, curr, index, arr) => {
-      //  当取到 school.name时,直接赋新值
-      if (arr.length - 1 === index) {
-        return data[curr] = value
-      }
-      return data[curr]
-    }, vm.$data)
-  },
   /** 
    * @param {*} node 节点 
    * @param {*} expr 表达式 school.msg
@@ -222,14 +211,9 @@ ComileUtil = {
     new Watcher(vm, expr, newval => {
       fn(node, newval)
     })
-    //  给节点增加一个事件监听
-    node.addEventListener('input', (e) => {
-      const value = e.target.value  //  获取当前用户输入的值
-      this.setValue(vm, expr, value)  //  设置新的值
-    })
 
     //  获取表达式值方法
-    const value = this.getValue(vm, expr) //  返回 fish
+    let value = this.getValue(vm, expr) //  返回 fish
 
     fn(node, value)
   },
@@ -239,7 +223,7 @@ ComileUtil = {
   getContentValue (vm, expr) {
     //  遍历表达式 将内容 重新替换成 一个 完成的内容 返回回去 
     return expr.replace(/\{\{(.+?)\}\}/g, (...args) => {
-      return this.getValue(vm, args[1])
+      return this.getVal(vm, args[1])
     })
   },
   text (node, expr, vm) {       //  {{a}} {{b}} => a b
@@ -286,21 +270,8 @@ class Vue {
       //  将数据 全部转换成用 Object.defineProperty定义
       new Observer(this.$data)
 
-      //  将vm上的取值操作 代理到 vm.$data中
-      this.proxyVm(this.$data)
-
       //  编译
       new Comiler(this.$el, this)
-    }
-  }
-
-  proxyVm (data) {
-    for (const key in data) {   //  data :  school.name age
-      Object.defineProperty(this, key, {
-        get () {
-          return data[key]    //  进行了转化操作
-        }
-      })
     }
   }
 
