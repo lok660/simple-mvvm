@@ -339,6 +339,9 @@ class Vue {
       Object.defineProperty(this, key, {
         get () {
           return data[key]    //  进行了转化操作
+        },
+        set (newval) {
+          data[key] = newval
         }
       })
     }
