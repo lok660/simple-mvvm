@@ -1,3 +1,47 @@
+//  订阅 当数据变化,通知观察者更新
+class Dep {
+  constructor() {
+    this.subs = []  //  存放所有的wathcer
+  }
+  //  订阅 添加 watcher
+  addSub (watcher) {
+    this.subs.push(watcher)
+  }
+  //  发布 更新
+  notify () {
+    this.subs.forEach(watcher => watcher.update())
+  }
+}
+
+//  观察者 (发布订阅)
+class Watcher {
+
+  constructor(vm, expr, cb) {
+    this.vm = vm
+    this.expr = expr
+    this.cb = cb
+    //  默认存放一个老值
+    this.oldValue = this.getVal()
+  }
+  //  获取旧的值
+  getVal () {
+    Dep.target = this   //  先把自己放在this上
+    const value = ComileUtil.getVal(this.vm, this.expr)    //  取值,把观察者和数据关联起来
+    Dep.target = null
+    return value
+  }
+  //  更新操作 数据变化后 会调用观察者的update方法 
+  update () {
+    //  获取新的值
+    let newval = ComileUtil.getVal(this.vm, this.expr)
+    //  如果新值与旧值不相等 则调用回调方法
+    if (newval !== this.oldValue) {
+      this.cb(newval)
+    }
+  }
+
+}
+
 //  给数据加上劫持绑定,实现数据劫持功能
 class Observer {
   constructor(data) {
@@ -16,8 +60,13 @@ class Observer {
   defineReactive (obj, key, value) {
     //  递归
     this.observer(value)
+    //  给每个属性加上 具有发布订阅的 功能
+    let dep = new Dep()
+    //  给每个属性加上监听
     Object.defineProperty(obj, key, {
       get () {
+        Dep.target && dep.addSub(Dep.target)
+        //  创建watcher时 会取到对应的内容,并且把watcher放到了全局上
         return value
       },
       //  设置新值
@@ -38,8 +87,8 @@ class Observer {
 //  编译
 class Comiler {
   /**
-   * @param {Node,String} el 根元素
-   * @param {*} vm vue实例
+   * @param {Node,String} el 根元素 el:#app
+   * @param {*} vm vue实例 this
    */
   constructor(el, vm) {
     //  判断el属性,是否为元素,不是则querySelector获取实例
@@ -53,6 +102,7 @@ class Comiler {
 
     //  编译模板 用数据编译
     this.compile(fragment)
+
     //  将内容塞到页面中
     this.el.appendChild(fragment)
 
@@ -70,11 +120,11 @@ class Comiler {
       //  attr: v-model="school.name"  
       //  name: v-model,expr:"school.name"  from attr
       let { name, value: expr } = attr
-      console.log(attr)
+      // console.log(attr)
       //  如果是指令
       if (this.isDirective(name)) {
         //  解构获取指令名 model html text
-        let [, directive] = name.split('-')
+        const [, directive] = name.split('-')
 
         //  需要用不同的指令来处理
         ComileUtil[directive](node, expr, this.vm)
@@ -89,7 +139,6 @@ class Comiler {
 
     //  通过正则拿到括号中间的值
     if (/\{\{(.+?)\}\}/.test(content)) {
-      // console.log(content)
       //  文本节点
       ComileUtil['text'](node, content, this.vm) //  {{a}} {{b}} 替换a和b
     }
@@ -157,6 +206,13 @@ ComileUtil = {
 
     //  获取model的更新方法
     let fn = this.updater['modelUpdater']
+
+    //  给输入框加一个观察者,如果数据更新了,会触发此方法
+    //  方法会拿新的值给输入框赋值  (在数据内部添加一个观察者)
+    new Watcher(vm, expr, newval => {
+      fn(node, newval)
+    })
+
     //  获取表达式值方法
     let value = this.getValue(vm, expr) //  返回 fish
 
@@ -165,14 +221,27 @@ ComileUtil = {
   html () {
     //  node.innerHTML = xxx
   },
-  text (node, expr, vm) {
+  getContentValue (vm, expr) {
+    //  遍历表达式 将内容 重新替换成 一个 完成的内容 返回回去 
+    return expr.replace(/\{\{(.+?)\}\}/g, (...args) => {
+      return this.getVal(vm, args[1])
+    })
+  },
+  text (node, expr, vm) {       //  {{a}} {{b}} => a b
     let fn = this.updater['textUpdater']
     //  获取到 {{a}}  括号中间的值
     let content = expr.replace(/\{\{(.+?)\}\}/g, (...args) => {
-      //  从vm中获取括号中的值
-      return this.getValue(vm, args[1])
-    })
+      //  给表达式每个 {{}} 都加上 观察者  {{a}} {{b}}
+      new Watcher(vm, args[1], () => {
+        fn(node, thi.getContentValue(vm, expr))   //  返回了一个全新的字符串
+      })
 
+      // 0: "{{school.name}}"
+      // 1: "school.name"
+      // 2: 0
+      // 3: "{{school.name}}"
+      return this.getValue(vm, args[1]) //  从vm中获取括号中的值
+    })
     fn(node, content)
   },
   updater: {
