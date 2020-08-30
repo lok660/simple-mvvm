@@ -10,10 +10,13 @@
       <input type="text" v-model="school.name" />
       <div>{{school.name}}</div>
       <div>{{school.age}}</div>
+      {{getNewName}}
       <ul>
         <li>1</li>
         <li>2</li>
       </ul>
+      <button v-on:click="change">更新</button>
+      <div v-html="message"></div>
     </div>
 
     <script src="vue.js"></script>
@@ -26,9 +29,18 @@
             name: 'fish',
             age: 10,
           },
+          message: '<h1>欢迎大家</h1>',
         },
-        methods: {},
-        computed: {},
+        methods: {
+          change() {
+            this.school.name = 'lok'
+          },
+        },
+        computed: {
+          getNewName() {
+            return (this.school.name = '嘿嘿')
+          },
+        },
       })
     </script>
   </body>

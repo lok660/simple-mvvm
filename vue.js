@@ -127,8 +127,11 @@ class Comiler {
         //  解构获取指令名 model html text
         const [, directive] = name.split('-')
 
+        //  存在v-on:click情况,需要再次解析  
+        let [directiveName, eventName] = directive.split(':')
+
         //  需要用不同的指令来处理
-        ComileUtil[directive](node, expr, this.vm)
+        ComileUtil[directiveName](node, expr, this.vm, eventName)
       }
     })
   }
@@ -206,6 +209,12 @@ ComileUtil = {
       return data[curr]
     }, vm.$data)
   },
+  //  v-on:click="change"     expr指change
+  on (node, expr, vm, eventName) {
+    node.addEventListener(eventName, (e) => {
+      vm[expr].call(vm, e)  //  绑定this,此时this指node,需要指向vm
+    })
+  },
   /** 
    * @param {*} node 节点 
    * @param {*} expr 表达式 school.msg
@@ -233,8 +242,18 @@ ComileUtil = {
 
     fn(node, value)
   },
-  html () {
-    //  node.innerHTML = xxx
+  html (node, expr, vm) {   //  expr => v-html="message"  message
+    let fn = this.updater['htmlUpdater']
+
+    //  给输入框加一个观察者,如果数据更新了,会触发此方法
+    //  方法会拿新的值给输入框赋值  (在数据内部添加一个观察者)
+    new Watcher(vm, expr, newval => {
+      fn(node, newval)
+    })
+    //  获取表达式值方法
+    const value = this.getValue(vm, expr) //  返回 fish
+
+    fn(node, value)
   },
   getContentValue (vm, expr) {
     //  遍历表达式 将内容 重新替换成 一个 完成的内容 返回回去 
@@ -248,7 +267,7 @@ ComileUtil = {
     let content = expr.replace(/\{\{(.+?)\}\}/g, (...args) => {
       //  给表达式每个 {{}} 都加上 观察者  {{a}} {{b}}
       new Watcher(vm, args[1], () => {
-        fn(node, thi.getContentValue(vm, expr))   //  返回了一个全新的字符串
+        fn(node, this.getContentValue(vm, expr))   //  返回了一个全新的字符串
       })
 
       // 0: "{{school.name}}"
@@ -265,7 +284,7 @@ ComileUtil = {
       node.value = value
     },
     htmlUpdater () {
-
+      node.innerHTML = value
     },
     //  处理文本节点
     textUpdater (node, value) {
@@ -279,12 +298,33 @@ class Vue {
   constructor(options) {
     this.$el = options.el
     this.$data = options.data
+    let computed = options.computed
+    let methods = options.methods
     //  这个根元素 存在 编译模板
     //  el:"#app"
     if (this.$el) {
 
       //  将数据 全部转换成用 Object.defineProperty定义
       new Observer(this.$data)
+
+      //  实现computed功能
+      for (const key in computed) {     //  有依赖关系  数据
+        //  不能代理到this,应该代理到$data
+        Object.defineProperty(this.$data, key, {
+          get: () => {
+            //  取值时间是就是取函数的返回结果
+            return computed[key].call(this)
+          }
+        })
+      }
+
+      for (const key in methods) {
+        Object.defineProperty(this, key, {
+          get () {
+            return methods[key]
+          }
+        })
+      }
 
       //  将vm上的取值操作 代理到 vm.$data中
       this.proxyVm(this.$data)
@@ -303,5 +343,4 @@ class Vue {
       })
     }
   }
-
 }
